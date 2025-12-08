@@ -38,41 +38,55 @@ def detect_terminals():
     if st.session_state.potential_node is None:
         st.session_state.potential_node = []
     
-    confirmed_koumoku = st.session_state.get('kakunin_koumoku', {})
-    confirmed_koutei = st.session_state.get('koutei_kakunin', {})
-    q_and_a = {**confirmed_koumoku, **confirmed_koutei}
+    # confirmed_koumoku = st.session_state.get('kakunin_koumoku', {})
+    # confirmed_koutei = st.session_state.get('koutei_kakunin', {})
+    # q_and_a = {**confirmed_koumoku, **confirmed_koutei}
     
     remaining_nodes = []
     
     for node in st.session_state.potential_node:
         match = True
-        t1 = node.get("t1", [])
+        q_len = 0
+        correct = 0
+        q_list = ["t1", "t2", "r"]
         
-        # 質問と回答の照合ロジック
-        # ここでは「回答済みの質問」についてのみチェックを行う
-        # ユーザーの回答(a)と、ノードの条件(condition["a"])が一致しない場合のみ除外        
-        for condition in t1:
-            q_code = condition["q"]
-            expected_a = condition["a"]
-            
-            # ユーザーがこの質問に回答しているか確認
-            if q_code in q_and_a:
-                user_a = q_and_a[q_code]
+        for q_key in q_list:
+            q = node.get(q_key, [])
+            q_len += len(q)
+            # 質問と回答の照合ロジック
+            # ここでは「回答済みの質問」についてのみチェックを行う
+            # ユーザーの回答(a)と、ノードの条件(condition["a"])が一致しない場合のみ除外        
+            for condition in q:
+                q_code = condition["q"]
+                expected_a = condition["a"]
                 
-                # ユーザーの回答が「不明」なら判定材料にしない（スキップ）
-                if user_a == "不明":
-                    continue
-                
-                # 回答が食い違っていたらマッチしない
-                if user_a != expected_a:
-                    match = False
-                    break
-        
-        if match:
-            remaining_nodes.append(node)
+                # ユーザーがこの質問に回答しているか確認
+                if q_code in st.session_state.answer:
+                    user_a = st.session_state.answer[q_code]
+                    
+                    # ユーザーの回答が「不明」なら判定材料にしない（スキップ）
+                    if user_a == "不明":
+                        continue
+                    
+                    # 回答が食い違っていたらマッチしない
+                    if user_a != expected_a:
+                        match = False
+                        break
+                    else:
+                        correct += 1
             
+            if match:
+                node["score"] = correct / q_len if q_len > 0 else 0
+                remaining_nodes.append(node)
+
+    # 【追加】IDに基づいて重複を排除する
+    # 辞書を使ってIDをキーにすることで重複を取り除き、リストに戻します
+    unique_nodes_dict = {node['id']: node for node in remaining_nodes}
+    remaining_nodes = list(unique_nodes_dict.values())
+
     # フィルタリング後のリストで更新
     st.session_state.potential_node = remaining_nodes
+    st.session_state.potential_node.sort(key=lambda x: x.get("score", 0), reverse=True)
     
     return remaining_nodes
 
@@ -82,8 +96,6 @@ def load_questions():
         questions_data = json.load(f)["questions"]
         st.session_state.questions_data = questions_data
     return questions_data
-
-
 
 def show_results():
     st.write("ステップ4：診断結果表示")
@@ -102,7 +114,7 @@ def show_results():
             if i >= 4:
                 break
     
-    st.button("最初に戻る", on_click=lambda: st.session_state.update(step=1, step1_option=0, defect_name=None, kakunin_koumoku={}, koutei_kakunin={}, potential_node=None), type="primary")
+    st.button("最初に戻る", on_click=lambda: st.session_state.update(step=1, step1_option=0, defect_name=None, answer={}, potential_node=None), type="primary")
 
 def show_questions():
     load_questions()
@@ -115,7 +127,7 @@ def show_questions():
         remaining = t2 + r
         for condition in remaining:
             q_code = condition["q"]
-            if (q_code not in remaining_questions_code) and (q_code not in st.session_state.kakunin_koumoku) and (q_code not in st.session_state.koutei_kakunin):
+            if (q_code not in remaining_questions_code) and (q_code not in st.session_state.answer):
                 remaining_questions_code.append(q_code)
                 
     if not remaining_questions_code:
@@ -129,12 +141,12 @@ def show_questions():
         is_show = True
         if "requirements" in q:
             for dict in q["requirements"]:
-                if st.session_state.koutei_kakunin.get(dict["q"], None) != dict["a"]:
+                if st.session_state.answer.get(dict["q"], None) != dict["a"]:
                     is_show = False
                     break
             
         if is_show:
-            options = q.get("option", ["不明"]) if "option" in q else ["Yes", "No", "不明"]
+            options = q.get("option") if "option" in q else ["Yes", "No", "不明"]
             # デフォルトのインデックスを安全に設定
             # "不明"が含まれていればそれを選択、なければ最後の要素を選択、それもなければ0
             default_index = 0
@@ -142,12 +154,17 @@ def show_questions():
                 default_index = options.index("不明")
             elif len(options) > 0:
                 default_index = len(options) - 1
+            widget_key = f"radio_{q['code']}"
+            
+            def update_questions(code, key):
+                st.session_state.answer[code] = st.session_state[key]
                 
             st.radio(
                 q["label"], 
                 options,
                 index=default_index, 
-                on_change=lambda code=q["code"]: st.session_state.koutei_kakunin.update({code: st.session_state.koutei_kakunin[code]})
+                key=widget_key,
+                on_change=update_questions, 
+                args=(q["code"], widget_key)
             )
-        
-     
+

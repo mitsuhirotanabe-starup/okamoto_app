@@ -34,10 +34,12 @@ if 'kakunin_koumoku' not in st.session_state:
     st.session_state.kakunin_koumoku = {}
 if 'koutei_kakunin' not in st.session_state:
     st.session_state.koutei_kakunin = {}
-if 'potential_node' not in st.session_state:
-    st.session_state.potential_node = None
-if 'questions_data' not in st.session_state:
-    st.session_state.questions_data = None
+if 'answer' not in st.session_state:
+    st.session_state.answer = {}
+# if 'potential_node' not in st.session_state:
+#     st.session_state.potential_node = None
+# if 'questions_data' not in st.session_state:
+#     st.session_state.questions_data = None
 
 
 st.title("不良診断アシスタント (Streamlit)")
