@@ -19,99 +19,60 @@ def load_questions(defect_name, step):
         st.session_state.answer[q["code"]] = "不明"
     return questions_data
 
-# ただしくセッションに保存されるように更新関数を定義
+# 回答を更新する関数
 def update_questions(question_code, step):
-    # if step == 2:
-    #     st.session_state.kakunin_koumoku[question_code] = st.session_state[question_code]
-    # else:
-    #     st.session_state.koutei_kakunin[question_code] = st.session_state[question_code]
     st.session_state.answer[question_code] = st.session_state[question_code]
 
-# step 2: 確認項目
-def kakunin_koumoku():
-    st.write("確認項目")
-    questions_data = load_questions(st.session_state.defect_name, step=2)
-     
+
+def question_page(step=2):    
+    questions_data = load_questions(st.session_state.defect_name, step=step)
     if not questions_data:
         st.warning('質問が読み込めませんでした。')
         st.button("最初に戻る", on_click=lambda: st.session_state.update(step=1, step1_option=0, defect_name=None, answer={}), type="primary")
         return
-    
-    # if 'kakunin_koumoku' not in st.session_state:
-    #     st.session_state.kakunin_koumoku = {}
-        
+
     for q in questions_data:
-        options = q.get("option") if "option" in q else ["Yes", "No", "不明"]
-        # デフォルトのインデックスを安全に設定
-        # "不明"が含まれていればそれを選択、なければ最後の要素を選択、それもなければ0
-        default_index = 0
-        if "不明" in options:
-            default_index = options.index("不明")
-        elif len(options) > 0:
-            default_index = len(options) - 1
-            
-        st.radio(
-            q["label"], 
-            options,
-            index=default_index,
-            key=q["code"], 
-            on_change=update_questions, 
-            args=(q["code"], 2)
-        )
         
-    st.divider()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.button("戻る", on_click=lambda: st.session_state.update(step=1))
-    with col2:
-        st.button("次へ進む", on_click=lambda: st.session_state.update(step=3), type="primary")
- 
-# step 3: 工程確認       
-def koutei_kakunin():
-    st.write("ステップ3：工程確認回答")
-    questions_data = load_questions(st.session_state.defect_name, step=3)
-    
-    if not questions_data:
-        st.warning('質問が読み込めませんでした。')
-        st.button("最初に戻る", on_click=lambda: st.session_state.update(step=1, step1_option=0, defect_name=None, answer={}), type="primary")
-        return
-    
-    # if 'koutei_kakunin' not in st.session_state:
-    #     st.session_state.koutei_kakunin = {}
-        
-    for q in questions_data:
-        # 質問の要件がある場合、チェックして表示/非表示を制御
         is_show = True
         if "requirements" in q:
-            for dict in q["requirements"]:
-                if st.session_state.answer.get(dict["q"], None) != dict["a"]:
+            for requirements_dict in q["requirements"]:
+                if st.session_state.answer.get(requirements_dict["q"], None) != requirements_dict["a"]:
                     is_show = False
                     break
             
         options = q.get("option") if "option" in q else ["Yes", "No", "不明"]
-        # デフォルトのインデックスを安全に設定
-        # "不明"が含まれていればそれを選択、なければ最後の要素を選択、それもなければ0
         default_index = 0
         if "不明" in options:
             default_index = options.index("不明")
         elif len(options) > 0:
             default_index = len(options) - 1
-            
-        if is_show:
-            st.radio(
-                q["label"], 
-                options,
-                index=default_index,
-                key=q["code"], 
-                on_change=update_questions, 
-                args=(q["code"], 3)
-            )
         
-    st.divider()
-    
-    col1, col2 = st.columns(2)
+        # 一旦保存している回答をセット
+        if q["code"] in st.session_state.answer:
+            default_index = options.index(st.session_state.answer[q["code"]])
+            
+        # カードのすぐ下に（あるいは重なるように）ラジオボタンを配置
+        # label_visibility="collapsed" でデフォルトのラベルを消す
+        if is_show:
+            # カードの開始
+            with st.container(border=True):
+                st.radio(
+                    q["label"], 
+                    options,
+                    index=default_index,
+                    key=q["code"], 
+                    on_change=update_questions, 
+                    args=(q["code"], 3),
+                    horizontal=True,
+                )
+            
+    col1, col2, col3, col4, col5 = st.columns([1,1,1,4,1])
     with col1:
-        st.button("戻る", on_click=lambda: st.session_state.update(step=2))
+        st.button("最初に戻る", on_click=st.session_state.clear, args=(), use_container_width=True)
     with col2:
-        st.button("次へ進む", on_click=lambda: st.session_state.update(step=4), type="primary")
+        st.button("一旦保存", on_click=lambda: st.session_state.update(step=1, save_step=step, step1_option=0), use_container_width=True)
+    with col3:
+        st.button("戻る", on_click=lambda: st.session_state.update(step=step-1), use_container_width=True)
+    with col5:
+        st.button("次へ進む", on_click=lambda: st.session_state.update(step=step+1), type="primary", use_container_width=True)
+            

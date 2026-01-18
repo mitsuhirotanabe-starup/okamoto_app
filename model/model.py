@@ -47,7 +47,7 @@ def predict(image):
         1:"kirai",
         2:"dakon",
         3:"arasare",
-        4:"yumawari"
+        4:"yusakai",
     }
 
     # モデルのロード
@@ -60,6 +60,8 @@ def predict(image):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
+    
+    image = image.convert('RGB')
     input_tensor = val_transform(image)
     input_batch = input_tensor.unsqueeze(0).to(torch.device('cpu'))
 
